@@ -34,7 +34,7 @@ The application features a modern UI with:
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/amaan-ee-iitr/AutoJudge.git
    cd AutoJudge
    ```
 
