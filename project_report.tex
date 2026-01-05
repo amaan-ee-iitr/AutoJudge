@@ -1,0 +1,291 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+% Page margins
+\geometry{margin=1in}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={AutoJudge Pro - Project Report},
+}
+
+% Code listing style
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    breaklines=true,
+    captionpos=b
+}
+
+% Header and Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{AutoJudge Pro - Project Report}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{}
+
+% Title formatting
+\titleformat{\section}
+{\Large\bfseries\color{blue}}
+{\thesection}{1em}{}
+
+\titleformat{\subsection}
+{\large\bfseries\color{blue!70}}
+{\thesubsection}{1em}{}
+
+\begin{document}
+
+% Title Page
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Huge\bfseries AutoJudge Pro}\\[0.5cm]
+    {\Large AI-Powered Competitive Programming Problem Difficulty Predictor}\\[1cm]
+    
+    \vspace{1.5cm}
+    
+    {\large\bfseries Project Report}\\[0.5cm]
+    
+    \vspace{2cm}
+    
+    \begin{flushleft}
+        \large
+        \textbf{Author:} Mohammad Amaan\\[0.3cm]
+        \textbf{Enroll Number:} 23115103\\[0.3cm]
+        \textbf{Institution:} Indian Institute of technology Roorkee\\[0.3cm]
+    
+    \textbf{Date:} \today\\[0.3cm]
+    \end{flushleft}
+    
+    \vfill
+    
+    \vspace{1cm}
+    \textit{An intelligent system for predicting programming problem difficulty using machine learning and natural language processing}
+    
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+
+% Abstract and Introduction
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+AutoJudge Pro is an innovative machine learning application designed to automatically predict the difficulty rating of competitive programming problems based on their textual descriptions. The system employs advanced natural language processing techniques combined with ensemble learning algorithms to classify problems into difficulty categories (Easy, Medium, Hard) and predict numerical ratings ranging from 800 to 3500.
+
+\section{Introduction}
+
+Competitive programming platforms face the challenge of accurately categorizing and rating problems to provide appropriate challenges for participants at different skill levels. Manual rating assignment is time-consuming, subjective, and difficult to scale. AutoJudge Pro addresses this challenge by leveraging machine learning to automate the difficulty assessment process.
+
+The system analyzes problem descriptions, input/output specifications, and titles to extract meaningful features using Term Frequency-Inverse Document Frequency (TF-IDF) vectorization. These features are then fed into Random Forest ensemble models to predict both categorical difficulty levels and numerical ratings.
+
+\section{Objectives}
+
+\subsection{Primary Objectives}
+\begin{enumerate}
+    \item Develop a machine learning model to classify programming problems into three difficulty categories: Easy, Medium, and Hard
+    \item Create a regression model to predict numerical difficulty ratings (800-3500)
+    \item Implement effective text preprocessing and feature engineering techniques
+    \item Build an intuitive web interface using Streamlit for real-time predictions
+    \item Achieve high accuracy in both classification and regression tasks
+\end{enumerate}
+
+\subsection{Secondary Objectives}
+\begin{itemize}
+    \item Handle class imbalance using SMOTE technique
+    \item Implement robust text preprocessing for various input formats
+    \item Create visualizations for model evaluation
+    \item Provide a modern, aesthetically pleasing user interface
+\end{itemize}
+
+\section{Technology Stack}
+
+The project utilizes the following technologies:
+\begin{itemize}
+    \item \textbf{Python 3.8+}: Primary programming language
+    \item \textbf{scikit-learn}: Random Forest models, TF-IDF vectorization, preprocessing
+    \item \textbf{imbalanced-learn}: SMOTE for class balancing
+    \item \textbf{pandas \& numpy}: Data manipulation and numerical computations
+    \item \textbf{Streamlit}: Web application framework
+    \item \textbf{matplotlib \& seaborn}: Data visualization
+    \item \textbf{joblib}: Model serialization
+\end{itemize}
+
+\section{Methodology}
+
+\subsection{Data Preprocessing}
+Training data is stored in JSONL format containing problem titles, descriptions, input/output specifications, and difficulty classes. The preprocessing pipeline includes:
+\begin{itemize}
+    \item Text sanitization: lowercase conversion, HTML tag removal
+    \item Feature combination: concatenation of all text fields
+    \item Class normalization: standardization to Easy, Medium, Hard
+\end{itemize}
+
+\subsection{Feature Engineering}
+\begin{itemize}
+    \item \textbf{TF-IDF Vectorization}: Converts text into numerical features (max\_features=1000, stop words removed)
+    \item \textbf{Word Count Feature}: Number of words in processed text, normalized using MinMaxScaler
+    \item \textbf{Rating Generation}: Easy (800-1000), Medium (1100-1500), Hard (1600-3500)
+\end{itemize}
+
+\subsection{Model Architecture}
+\begin{itemize}
+    \item \textbf{Classification Model}: Random Forest Classifier (100 estimators) trained on SMOTE-balanced data
+    \item \textbf{Regression Model}: Random Forest Regressor (100 estimators) trained on original data
+    \item \textbf{Data Split}: 80\% training, 20\% testing
+    \item \textbf{Evaluation Metrics}: Accuracy for classification, Mean Absolute Error (MAE) for regression
+\end{itemize}
+
+\section{Implementation}
+
+The system consists of two main components:
+
+\subsection{Training Module (train\_model.py)}
+\begin{enumerate}
+    \item Loads and preprocesses JSONL data
+    \item Applies TF-IDF vectorization and feature extraction
+    \item Splits data and applies SMOTE to training set
+    \item Trains classification and regression models
+    \item Generates evaluation metrics and visualizations
+    \item Saves models and preprocessing objects
+\end{enumerate}
+
+\subsection{Web Application (app.py)}
+\begin{itemize}
+    \item Loads trained models using Streamlit's caching mechanism
+    \item Provides user interface for problem input
+    \item Performs real-time feature extraction and prediction
+    \item Displays results with interactive visualizations
+    \item Features modern UI with glassmorphism design and 3D effects
+\end{itemize}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{ui_screenshot.png}
+    \caption{AutoJudge Pro Web Application Interface}
+    \label{fig:ui_screenshot}
+\end{figure}
+\section{User Interface Design}
+
+The AutoJudge Pro web application features a modern, visually appealing interface designed to provide an excellent user experience. The UI incorporates several advanced design principles and visual effects.
+
+
+
+
+Figure~\ref{fig:ui_screenshot} shows the main interface of the AutoJudge Pro web application, demonstrating the glassmorphism design, input fields, and result visualization.
+
+
+
+
+
+\section{Challenges Faced}
+
+\subsection{Data-Related Challenges}
+\begin{itemize}
+    \item \textbf{Class Imbalance}: Addressed using SMOTE on training data only to prevent data leakage
+    \item \textbf{Text Preprocessing}: Implemented comprehensive sanitization for HTML tags and inconsistent formats
+    \item \textbf{Feature Engineering}: Used TF-IDF vectorization and word count features for effective representation
+\end{itemize}
+
+\subsection{Model Development Challenges}
+\begin{itemize}
+    \item \textbf{Hyperparameter Tuning}: Used default parameters with 100 estimators, validated through experimentation
+    \item \textbf{Dual Prediction System}: Ensured consistency by clipping and rounding regression outputs
+    \item \textbf{Model Evaluation}: Proper train-test split before SMOTE application for realistic metrics
+\end{itemize}
+
+\subsection{Web Application Challenges}
+\begin{itemize}
+    \item \textbf{Model Loading}: Implemented Streamlit's \texttt{@st.cache\_resource} for efficient caching
+    \item \textbf{UI/UX Design}: Created custom CSS with glassmorphism effects and 3D animations
+    \item \textbf{Performance}: Optimized feature extraction pipeline for real-time predictions
+\end{itemize}
+
+\subsection{Technical Challenges}
+\begin{itemize}
+    \item \textbf{Dependency Management}: Virtual environment isolation and comprehensive requirements.txt
+    \item \textbf{Memory Usage}: Limited max\_features parameter to handle large datasets efficiently
+    \item \textbf{Data Format}: Implemented support for both JSON and JSONL formats
+\end{itemize}
+
+\section{Future Scope and Enhancements}
+
+\subsection{Model Improvements}
+\begin{itemize}
+    \item Implement deep learning models (LSTM, Transformers) for better text understanding
+    \item Utilize pre-trained language models (BERT, GPT) for feature extraction
+    \item Add advanced NLP features: word embeddings, NER, topic modeling
+    \item Implement automated hyperparameter tuning
+\end{itemize}
+
+\subsection{Application Features}
+\begin{itemize}
+    \item Batch processing for multiple problems
+    \item RESTful API for programmatic access
+    \item Integration with competitive programming platforms
+    \item Model interpretability using SHAP values
+    \item Enhanced analytics dashboard
+\end{itemize}
+
+\subsection{Deployment}
+\begin{itemize}
+    \item Containerization using Docker
+    \item CI/CD pipeline for automated deployment
+    \item Scalability improvements with load balancing
+    \item Performance monitoring and error tracking
+\end{itemize}
+
+\section{Conclusion}
+
+AutoJudge Pro successfully demonstrates the feasibility of automated difficulty assessment for competitive programming problems. The system effectively combines NLP techniques with ensemble learning to provide accurate predictions. Key achievements include:
+
+\begin{itemize}
+    \item Effective text preprocessing and TF-IDF feature extraction
+    \item Robust handling of class imbalance through SMOTE
+    \item Dual prediction system for categorical and numerical ratings
+    \item Modern, user-friendly web interface
+    \item Comprehensive model evaluation
+\end{itemize}
+
+The project addresses the challenges of manual problem rating by providing an automated, scalable solution. While the current implementation provides a solid foundation, there is significant potential for enhancement through advanced ML techniques, expanded datasets, and improved features.
+
+\newpage
+
+% References
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+\begin{enumerate}
+    \item Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. \textit{Journal of Machine Learning Research}, 12, 2825-2830.
+    
+    \item Chawla, N. V., et al. (2002). SMOTE: Synthetic Minority Over-sampling Technique. \textit{Journal of Artificial Intelligence Research}, 16, 321-357.
+    
+    \item Breiman, L. (2001). Random Forests. \textit{Machine Learning}, 45(1), 5-32.
+    
+    \item Streamlit Team. (2023). Streamlit Documentation. \url{https://docs.streamlit.io/}
+\end{enumerate}
+
+\end{document}
