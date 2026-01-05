@@ -1,164 +1,184 @@
 import streamlit as st
-import pickle
-import plotly.graph_objects as go
+import joblib
+import numpy as np
+import re
+import pandas as pd
 
-# --- 1. Load Models ---
-try:
-    with open('model_data.pkl', 'rb') as f:
-        bundle = pickle.load(f)
-    classifier = bundle["classifier"]
-    regressor = bundle["regressor"]
-    vectorizer = bundle["vectorizer"]
-except FileNotFoundError:
-    st.error("⚠️ Model file not found. Run 'python train.py' first.")
-    st.stop()
+# ==========================================
+# 1. SETUP & LOADING
+# ==========================================
+st.set_page_config(page_title="AutoJudge AI", page_icon="⚖️", layout="centered")
 
-# --- 2. Logic Helpers ---
-def convert_to_cf_rating(score):
-    rating = 800 + (score - 1) * 300
-    return int(max(800, min(3500, round(rating / 100) * 100)))
-
-def get_rating_color(rating):
-    if rating < 1200: return "#CCCCCC" # Newbie (Gray)
-    if rating < 1400: return "#77FF77" # Pupil (Light Green)
-    if rating < 1600: return "#03A89E" # Specialist (Cyan)
-    if rating < 1900: return "#AAAAFF" # Expert (Blue)
-    if rating < 2100: return "#FF88FF" # Candidate Master (Purple)
-    if rating < 2400: return "#FFCC88" # Master (Orange)
-    return "#FF3333"                 # Grandmaster (Red)
-
-# --- 3. Page Config & 3D CSS ---
-st.set_page_config(page_title="AutoJudge 3D", page_icon="🧊", layout="centered")
-
-# Custom CSS for 3D Effects (Neumorphism / Glassmorphism)
+# --- 3D CSS STYLES ---
 st.markdown("""
 <style>
-    /* Global Background */
+    /* Background Gradient */
     .stApp {
-        background: linear-gradient(135deg, #1e1e2f 0%, #252540 100%);
-        color: white;
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
     }
-    
-    /* 3D Title */
-    h1 {
-        text-shadow: 2px 2px 0px #000000;
-        font-weight: 800;
+    @keyframes gradient {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
     }
 
-    /* Floating Input Cards */
-    .stTextArea textarea {
-        background-color: #2b2b40;
-        color: #ffffff;
-        border: 1px solid #444;
-        border-radius: 12px;
-        box-shadow: 5px 5px 15px rgba(0,0,0,0.5), 
-                   -2px -2px 10px rgba(255,255,255,0.05);
-        transition: all 0.3s ease;
+    /* Text Styling */
+    div.stTextArea > label, div.stTextInput > label {
+        color: #333 !important; /* Dark text for inside white cards */
+        font-weight: bold;
+        font-size: 1.1rem;
     }
-    .stTextArea textarea:focus {
-        transform: translateY(-2px);
-        box-shadow: 8px 8px 20px rgba(0,0,0,0.6);
-        border-color: #6c5ce7;
+    
+    h1, h2, h3 {
+        font-family: 'Helvetica', sans-serif;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* 3D Card Class */
+    .card-3d {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        margin-bottom: 20px;
+    }
+    .card-3d:hover {
+        transform: translate3d(0, -5px, 0);
+        box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
     }
 
     /* 3D Button */
-    .stButton>button {
-        background: linear-gradient(145deg, #6c5ce7, #4834d4);
+    div.stButton > button {
+        background: linear-gradient(to bottom, #ff4b1f, #ff9068);
         color: white;
         border: none;
         border-radius: 10px;
-        padding: 15px 30px;
+        padding: 12px 24px;
         font-weight: bold;
-        box-shadow: 4px 4px 10px rgba(0,0,0,0.4), 
-                   -2px -2px 5px rgba(255,255,255,0.1);
-        transition: all 0.2s;
+        font-size: 18px;
+        box-shadow: 0 5px #c0392b;
+        transition: all 0.1s;
+        width: 100%;
     }
-    .stButton>button:active {
-        transform: scale(0.98);
-        box-shadow: inset 4px 4px 10px rgba(0,0,0,0.4);
-    }
-    
-    /* Result Card */
-    .result-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        text-align: center;
-        margin-bottom: 20px;
+    div.stButton > button:active {
+        box-shadow: 0 2px #c0392b;
+        transform: translateY(3px);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. Main UI ---
-st.title("🧊 AutoJudge 3D")
-st.caption("AI-Powered Competitive Programming Difficulty Estimator")
+@st.cache_resource
+def load_artifacts():
+    try:
+        clf = joblib.load('model_classifier.pkl')
+        reg = joblib.load('model_regressor.pkl')
+        vectorizer = joblib.load('vectorizer.pkl')
+        scaler = joblib.load('scaler.pkl')
+        return clf, reg, vectorizer, scaler
+    except FileNotFoundError:
+        return None, None, None, None
 
+clf, reg, vectorizer, scaler = load_artifacts()
+
+if clf is None:
+    st.error("❌ Error: Model files not found. Please run 'train.py' first.")
+    st.stop()
+
+# ==========================================
+# 2. HELPER FUNCTIONS
+# ==========================================
+def clean_text(text):
+    text = str(text).lower()
+    text = re.sub(r'<.*?>', '', text) 
+    return text
+
+def preprocess_input(description, input_desc, output_desc):
+    # Note: We do NOT use the title for prediction to maintain consistency 
+    # with how the model was trained (which only used desc + in + out).
+    combined_text = f"{description} {input_desc} {output_desc}"
+    cleaned_text = clean_text(combined_text)
+    
+    X_text = vectorizer.transform([cleaned_text]).toarray()
+    text_len = len(cleaned_text.split())
+    X_len = scaler.transform([[text_len]])
+    
+    return np.hstack((X_text, X_len))
+
+# ==========================================
+# 3. USER INTERFACE
+# ==========================================
+st.markdown("<h1 style='color: white; text-align: center;'>🤖 AutoJudge AI</h1>", unsafe_allow_html=True)
+st.markdown("<p style='color: white; text-align: center; margin-bottom: 30px;'>Predict Competitive Programming Problem Difficulty</p>", unsafe_allow_html=True)
+
+# -- INPUT CARD --
 with st.container():
-    st.markdown("### 📝 Problem Details")
-    desc = st.text_area("Paste Problem Description", height=200, placeholder="Once upon a time in Berland...")
+    st.markdown('<div class="card-3d">', unsafe_allow_html=True)
+    
+    # NEW: Problem Title Input
+    title = st.text_input("Problem Title", placeholder="e.g., Dijkstra's Shortest Path")
+    
+    desc = st.text_area("Problem Description", height=150, placeholder="e.g., Given a graph with N nodes...")
     
     col1, col2 = st.columns(2)
     with col1:
-        submitted = st.button("🚀 Predict Difficulty", use_container_width=True)
+        inp_desc = st.text_area("Input Format", height=80, placeholder="e.g., First line T...")
+    with col2:
+        out_desc = st.text_area("Output Format", height=80, placeholder="e.g., Print the integer...")
+        
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 5. Prediction & Visualization ---
-if submitted and desc:
-    # Processing
-    vec = vectorizer.transform([desc])
-    p_class = classifier.predict(vec)[0]
-    p_score = regressor.predict(vec)[0]
-    
-    cf_rating = convert_to_cf_rating(p_score)
-    color = get_rating_color(cf_rating)
+# ==========================================
+# 4. PREDICTION LOGIC
+# ==========================================
+st.write("") # Spacing
 
-    st.divider()
-    
-    # --- RESULT SECTION ---
-    c1, c2 = st.columns([1, 1.5])
-    
-    with c1:
-        # 3D Card for Text Result
+if st.button("🚀 Analyze Problem"):
+    if not desc:
+        st.warning("Please enter at least a problem description.")
+    else:
+        # Run Prediction
+        X_input = preprocess_input(desc, inp_desc, out_desc)
+        pred_class = clf.predict(X_input)[0]
+        pred_score = reg.predict(X_input)[0]
+        
+        display_class = pred_class.title()
+        
+        # Determine Color
+        if display_class == "Easy":
+            res_color = "#2ecc71"
+        elif display_class == "Medium":
+            res_color = "#f39c12"
+        else:
+            res_color = "#e74c3c"
+            
+        # Handle empty title for display
+        display_title = title if title else "Untitled Problem"
+
+        # -- RESULT CARD --
         st.markdown(f"""
-        <div class="result-card">
-            <h3 style="margin:0; color: #aaa;">Difficulty Tier</h3>
-            <h1 style="font-size: 3em; margin: 10px 0; color: {color}; text-shadow: 0 0 10px {color}88;">
-                {p_class.upper()}
-            </h1>
-            <p>Model Confidence: High</p>
+        <div class="card-3d" style="text-align: center;">
+            <h3 style='color: #555; margin: 0;'>Analysis Report for:</h3>
+            <h2 style='color: #333; margin-top: 5px;'>{display_title}</h2>
+            <hr style="border: 1px solid #eee;">
+            
+            <div style="display: flex; justify-content: space-around; align-items: center; margin-top: 20px;">
+                <div>
+                    <h4 style="color: #777; margin-bottom: 5px;">Class</h4>
+                    <h1 style="color: {res_color}; font-size: 3rem; margin: 0; text-shadow: 1px 1px 2px #ccc;">{display_class}</h1>
+                </div>
+                <div style="height: 60px; border-left: 2px solid #eee;"></div>
+                <div>
+                    <h4 style="color: #777; margin-bottom: 5px;">Rating</h4>
+                    <h1 style="color: #333; font-size: 3rem; margin: 0; text-shadow: 1px 1px 2px #ccc;">{int(pred_score)}</h1>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-    with c2:
-        # Plotly Gauge Chart (Looks 3D)
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = cf_rating,
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "Codeforces Rating", 'font': {'size': 20, 'color': "white"}},
-            number = {'font': {'color': color, 'weight': 'bold'}},
-            gauge = {
-                'axis': {'range': [800, 3500], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar': {'color': color, 'thickness': 0.7}, # The rating bar
-                'bgcolor': "rgba(0,0,0,0)",
-                'borderwidth': 2,
-                'bordercolor': "#333",
-                'steps': [
-                    {'range': [800, 1200], 'color': '#333'},
-                    {'range': [1200, 1900], 'color': '#444'},
-                    {'range': [1900, 2400], 'color': '#555'},
-                    {'range': [2400, 3500], 'color': '#666'}
-                ],
-                'threshold': {
-                    'line': {'color': "white", 'width': 4},
-                    'thickness': 0.75,
-                    'value': cf_rating
-                }
-            }
-        ))
-        
-        # Transparent background for graph
-        fig.update_layout(paper_bgcolor = "rgba(0,0,0,0)", font = {'color': "white", 'family': "Arial"})
-        st.plotly_chart(fig, use_container_width=True)
+        # Progress Bar
+        st.write(f"**Difficulty Meter**")
+        progress_val = min(max(pred_score / 3500, 0.0), 1.0)
+        st.progress(progress_val)
