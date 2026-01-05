@@ -1,13 +1,17 @@
 import streamlit as st
-import joblib
+import pickle
 import pandas as pd
 
-# 1. Load the saved models
+# 1. Load the saved models from the single bundle
 try:
-    classifier = joblib.load('model_classifier.pkl')
-    regressor = joblib.load('model_regressor.pkl')
-except:
-    st.error("Models not found. Please run train_model.py first.")
+    with open('model_data.pkl', 'rb') as f:
+        bundle = pickle.load(f)
+    
+    classifier = bundle["classifier"]
+    regressor = bundle["regressor"]
+    vectorizer = bundle["vectorizer"]
+except FileNotFoundError:
+    st.error("⚠️ Model file 'model_data.pkl' not found. Please run train.py first.")
     st.stop()
 
 # 2. UI Layout
@@ -33,13 +37,16 @@ if submitted:
     if not desc:
         st.warning("Please enter at least a Problem Description.")
     else:
-        # Combine inputs exactly how we did in training
+        # Combine inputs
         combined_text = (desc + " " + inp_desc + " " + out_desc).lower()
         
+        # --- CRITICAL STEP: Convert text to numbers ---
+        # The model cannot read text directly; it needs the vectorizer
+        vectorized_text = vectorizer.transform([combined_text])
+        
         # Make predictions
-        # Note: We pass a list [combined_text] because the model expects an iterable
-        pred_class = classifier.predict([combined_text])[0]
-        pred_score = regressor.predict([combined_text])[0]
+        pred_class = classifier.predict(vectorized_text)[0]
+        pred_score = regressor.predict(vectorized_text)[0]
         
         # Display Results
         st.divider()
@@ -49,13 +56,13 @@ if submitted:
         
         with c1:
             st.info("Predicted Category")
-            # Color coding based on result
+            # Color coding
             if pred_class.lower() == 'easy':
-                st.success(f"🟢 {pred_class}")
+                st.success(f"🟢 {pred_class.upper()}")
             elif pred_class.lower() == 'medium':
-                st.warning(f"🟡 {pred_class}")
+                st.warning(f"🟡 {pred_class.upper()}")
             else:
-                st.error(f"🔴 {pred_class}")
+                st.error(f"🔴 {pred_class.upper()}")
                 
         with c2:
             st.info("Predicted Score")
