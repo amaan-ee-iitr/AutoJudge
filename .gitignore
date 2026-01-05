@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual Environments (if you use them)
+venv/
+env/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Optional: Ignore large files if you want to keep repo light
+# problems.csv
+# *.pkl
