@@ -8,119 +8,118 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, mean_absolute_error, mean_squared_error
+from sklearn.metrics import accuracy_score, confusion_matrix, mean_absolute_error
 
 # ==========================================
-#  REQUIREMENT 1: DATA PREPROCESSING
+#  STEP 1: DATA INGESTION & CLEANING
 # ==========================================
-print("1. Data Preprocessing...")
+print(">> Step 1: Loading and sanitizing data...")
+
 try:
-    df = pd.read_json("problems.jsonl", lines=True)
+    raw_data = pd.read_json("problems.jsonl", lines=True)
 except ValueError:
-    df = pd.read_json("problems.jsonl")
+    raw_data = pd.read_json("problems.jsonl")
 
-# Combine text columns
-df['text_combined'] = df['description'].astype(str) + " " + \
-                      df['input_description'].astype(str) + " " + \
-                      df['output_description'].astype(str)
+# --- FIX: Normalize Class Names (Handle 'easy' vs 'Easy') ---
+# This forces all labels to be "Easy", "Medium", "Hard"
+raw_data['problem_class'] = raw_data['problem_class'].str.title() 
 
-def cleaner(text):
-    text = str(text).lower()
-    text = re.sub(r'<.*?>', '', text) 
-    return text
+# Print counts so we know exactly what we are working with
+print("   Dataset Distribution:")
+print(raw_data['problem_class'].value_counts())
 
-df['clean_text'] = df['text_combined'].apply(cleaner)
+# Merge fields
+raw_data['full_content'] = raw_data['title'].astype(str) + " " + \
+                           raw_data['description'].astype(str) + " " + \
+                           raw_data['input_description'].astype(str) + " " + \
+                           raw_data['output_description'].astype(str)
 
-# STRICT SCORING LOGIC
-def remap_score(row):
-    p_class = row['problem_class']
-    if p_class == 'Easy': return np.random.choice([800, 900, 1000])
-    elif p_class == 'Medium': return np.random.choice([1100, 1200, 1300, 1400, 1500])
+def text_sanitizer(raw_text):
+    s = str(raw_text).lower()
+    s = re.sub(r'<.*?>', '', s)
+    return s
+
+raw_data['processed_text'] = raw_data['full_content'].apply(text_sanitizer)
+
+# Assign Scores based on normalized class
+def generate_difficulty_rating(row_data):
+    category = row_data['problem_class']
+    if category == 'Easy': return np.random.choice([800, 900, 1000])
+    elif category == 'Medium': return np.random.choice([1100, 1200, 1300, 1400, 1500])
     else: return np.random.choice(range(1600, 3500, 100))
 
-df['problem_score'] = df.apply(remap_score, axis=1)
+raw_data['estimated_rating'] = raw_data.apply(generate_difficulty_rating, axis=1)
 
 # ==========================================
-#  REQUIREMENT 2: FEATURE EXTRACTION
+#  STEP 2: FEATURE ENGINEERING
 # ==========================================
-print("2. Feature Extraction...")
-# Feature A: TF-IDF
-vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
-X_text = vectorizer.fit_transform(df['clean_text']).toarray()
+print(">> Step 2: Vectorizing...")
 
-# Feature B: Text Length
-X_len = df['clean_text'].apply(lambda x: len(x.split())).values.reshape(-1, 1)
-scaler = MinMaxScaler()
-X_len = scaler.fit_transform(X_len)
+tfidf_engine = TfidfVectorizer(max_features=1000, stop_words='english')
+text_vec = tfidf_engine.fit_transform(raw_data['processed_text']).toarray()
+
+len_scaler = MinMaxScaler()
+lens = raw_data['processed_text'].apply(lambda x: len(x.split())).values.reshape(-1, 1)
+len_vec = len_scaler.fit_transform(lens)
 
 # Combine features
-X = np.hstack((X_text, X_len))
-y_class = df['problem_class']
-y_score = df['problem_score']
+X = np.hstack((text_vec, len_vec))
+y_class = raw_data['problem_class']
+y_score = raw_data['estimated_rating']
 
-# NEW: Split data (80% Train, 20% Test) to evaluate performance
+# --- STANDARD SPLIT (80% Train, 20% Test) ---
 X_train, X_test, y_class_train, y_class_test, y_score_train, y_score_test = train_test_split(
     X, y_class, y_score, test_size=0.2, random_state=42
 )
 
+print(f"   Split -> Train: {len(X_train)} samples, Test: {len(X_test)} samples")
+
 # ==========================================
-#  REQUIREMENT 3: EVALUATION (Metrics & Matrix)
+#  STEP 3: TRAINING & EVALUATION
 # ==========================================
-print("3. Training & Evaluating Models...")
+print(">> Step 3: Training Models...")
 
-# --- A. Classification Evaluation ---
-clf_eval = RandomForestClassifier(n_estimators=100, random_state=42)
-clf_eval.fit(X_train, y_class_train)
-y_pred_class = clf_eval.predict(X_test)
+# --- Classification ---
+# 'class_weight="balanced"' helps even if we don't manually undersample
+difficulty_classifier = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42)
+difficulty_classifier.fit(X_train, y_class_train)
 
-# Calculate Accuracy
-acc = accuracy_score(y_class_test, y_pred_class)
-print(f"\n>>> Classification Model Accuracy: {acc*100:.2f}%")
-print("\nDetailed Classification Report:")
-print(classification_report(y_class_test, y_pred_class))
+preds_class = difficulty_classifier.predict(X_test)
+acc = accuracy_score(y_class_test, preds_class)
+print(f"   Classifier Accuracy on Test Set: {acc*100:.2f}%")
 
-# Plot Confusion Matrix
-# FIX: Changed labels to lowercase ['easy', 'medium', 'hard'] to match your data
-cm = confusion_matrix(y_class_test, y_pred_class, labels=['easy', 'medium', 'hard'])
+# Confusion Matrix
+labels = ['Easy', 'Medium', 'Hard']
+cm = confusion_matrix(y_class_test, preds_class, labels=labels)
 
 plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-            xticklabels=['easy', 'medium', 'hard'], 
-            yticklabels=['easy', 'medium', 'hard'])
-plt.title('Confusion Matrix: Difficulty Prediction')
-plt.xlabel('Predicted Label')
-plt.ylabel('Actual Label')
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+plt.title('Standard Training Confusion Matrix')
+plt.ylabel('Actual')
+plt.xlabel('Predicted')
 plt.savefig('confusion_matrix.png')
-plt.close()
-print("Graph saved: 'confusion_matrix.png'")
+print(" Confusion Matrix saved ")
 
-# --- B. Regression Evaluation ---
-# (Rest of the code remains the same)
-reg_eval = RandomForestRegressor(n_estimators=100, random_state=42)
-reg_eval.fit(X_train, y_score_train)
-y_pred_score = reg_eval.predict(X_test)
+# --- Regression ---
+rating_predictor = RandomForestRegressor(n_estimators=100, random_state=42)
+rating_predictor.fit(X_train, y_score_train)
 
-mae = mean_absolute_error(y_score_test, y_pred_score)
-rmse = np.sqrt(mean_squared_error(y_score_test, y_pred_score))
+preds_score = rating_predictor.predict(X_test)
+mae = mean_absolute_error(y_score_test, preds_score)
+print(f"   Rating MAE: {mae:.2f}")
 
-print(f"\n>>> Regression Model Performance:")
-print(f"Mean Absolute Error (MAE): {mae:.2f} points")
-print(f"Root Mean Squared Error (RMSE): {rmse:.2f} points")
 # ==========================================
-#  REQUIREMENT 4: FINAL SAVING
+#  STEP 4: SAVING ARTIFACTS
 # ==========================================
-print("\n4. Retraining on FULL dataset and Saving Artifacts...")
+print(">> Step 4: Saving final models...")
 
-# We retrain on X (all data) so the saved model is as smart as possible
-clf = RandomForestClassifier(n_estimators=100, random_state=42)
-clf.fit(X, y_class)
+# Retrain on FULL dataset for the final product (Standard Practice)
+difficulty_classifier.fit(X, y_class)
+rating_predictor.fit(X, y_score)
 
-reg = RandomForestRegressor(n_estimators=100, random_state=42)
-reg.fit(X, y_score)
+joblib.dump(difficulty_classifier, 'classifier.pkl')
+joblib.dump(rating_predictor, 'regressor.pkl')
+joblib.dump(tfidf_engine, 'tfidf.pkl')
+joblib.dump(len_scaler, 'scaler.pkl')
 
-joblib.dump(clf, 'model_classifier.pkl')
-joblib.dump(reg, 'model_regressor.pkl')
-joblib.dump(vectorizer, 'vectorizer.pkl')
-joblib.dump(scaler, 'scaler.pkl')
-
-print("✅ All requirements met. Models and Evaluation results saved.")
+print("✅ Models Trained")

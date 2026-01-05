@@ -1,184 +1,261 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import joblib
 import numpy as np
 import re
-import pandas as pd
+import textwrap
 
 # ==========================================
-# 1. SETUP & LOADING
+# 1. PAGE CONFIGURATION & ULTRA-MODERN 3D CSS
 # ==========================================
-st.set_page_config(page_title="AutoJudge AI", page_icon="⚖️", layout="centered")
+st.set_page_config(page_title="AutoJudge Pro", page_icon="⚡", layout="centered")
 
-# --- 3D CSS STYLES ---
 st.markdown("""
 <style>
-    /* Background Gradient */
+    /* --- 1. Animated Deep Space Background --- */
     .stApp {
-        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1e3c72);
         background-size: 400% 400%;
-        animation: gradient 15s ease infinite;
+        animation: gradientBG 15s ease infinite;
+        color: #e0e0e0;
     }
-    @keyframes gradient {
-        0% {background-position: 0% 50%;}
-        50% {background-position: 100% 50%;}
-        100% {background-position: 0% 50%;}
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
 
-    /* Text Styling */
-    div.stTextArea > label, div.stTextInput > label {
-        color: #333 !important; /* Dark text for inside white cards */
-        font-weight: bold;
-        font-size: 1.1rem;
+    /* --- 2. Glassmorphism 3D Container Styles --- */
+    /* This targets the container wrapping the inputs */
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"] {
+        background: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); /* Deep shadow for floating effect */
+        backdrop-filter: blur(12px); /* FROSTED GLASS EFFECT */
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18); /* Subtle edge */
+        padding: 25px;
+        transition: all 0.4s ease;
     }
     
-    h1, h2, h3 {
-        font-family: 'Helvetica', sans-serif;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    /* Hover Lift Effect */
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] > [data-testid="stVerticalBlock"]:hover {
+        transform: translateY(-5px) scale(1.01);
+        box-shadow: 0 15px 45px 0 rgba(0, 0, 0, 0.4);
     }
 
-    /* 3D Card Class */
-    .card-3d {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
-        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
-        margin-bottom: 20px;
+    /* --- 3. Input Field Styling (Glass Insets) --- */
+    .stTextInput > label, .stTextArea > label {
+        color: #ffffff !important;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    .card-3d:hover {
-        transform: translate3d(0, -5px, 0);
-        box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
-    }
-
-    /* 3D Button */
-    div.stButton > button {
-        background: linear-gradient(to bottom, #ff4b1f, #ff9068);
-        color: white;
-        border: none;
+    
+    /* Making inputs look like inset glass */
+    .stTextInput > div > div > input, .stTextArea > div > div > textarea {
+        background-color: rgba(0, 0, 0, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 10px;
-        padding: 12px 24px;
-        font-weight: bold;
-        font-size: 18px;
-        box-shadow: 0 5px #c0392b;
-        transition: all 0.1s;
-        width: 100%;
     }
-    div.stButton > button:active {
-        box-shadow: 0 2px #c0392b;
+    .stTextInput > div > div > input:focus, .stTextArea > div > div > textarea:focus {
+        border: 1px solid rgba(255, 126, 95, 0.8) !important;
+        box-shadow: inset 0 0 10px rgba(255, 126, 95, 0.3);
+    }
+
+    /* --- 4. Tactile 3D Button --- */
+    .stButton > button {
+        background: linear-gradient(to right, #ff512f, #dd2476);
+        color: white;
+        font-size: 20px;
+        font-weight: bold;
+        border: none;
+        border-radius: 12px;
+        width: 100%;
+        padding: 15px;
+        /* The 3D "thickness" */
+        border-bottom: 4px solid #9e1a4d;
+        box-shadow: 0 10px 20px -10px rgba(221, 36, 118, 0.5);
+        transition: all 0.1s ease-in-out;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+    }
+    
+    /* 3D Press Animation */
+    .stButton > button:active {
         transform: translateY(3px);
+        border-bottom: 1px solid #9e1a4d; /* Shrink the border */
+        box-shadow: 0 5px 10px -10px rgba(221, 36, 118, 0.5);
+    }
+    
+    /* Main Titles */
+    h1 {
+        text-shadow: 0 4px 8px rgba(0,0,0,0.5);
     }
 </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# 2. LOAD TRAINED MODELS
+# ==========================================
 @st.cache_resource
-def load_artifacts():
+def load_engine():
     try:
-        clf = joblib.load('model_classifier.pkl')
-        reg = joblib.load('model_regressor.pkl')
-        vectorizer = joblib.load('vectorizer.pkl')
+        # Matches the filenames from your train.py
+        clf = joblib.load('classifier.pkl')
+        reg = joblib.load('regressor.pkl')
+        tfidf = joblib.load('tfidf.pkl')
         scaler = joblib.load('scaler.pkl')
-        return clf, reg, vectorizer, scaler
+        return clf, reg, tfidf, scaler
     except FileNotFoundError:
         return None, None, None, None
 
-clf, reg, vectorizer, scaler = load_artifacts()
+classifier, regressor, tfidf, scaler = load_engine()
 
-if clf is None:
-    st.error("❌ Error: Model files not found. Please run 'train.py' first.")
+if not classifier:
+    st.error("⚠️ Critical Error: Model files not found. Please run 'train_model.py' first.")
     st.stop()
 
 # ==========================================
-# 2. HELPER FUNCTIONS
+# 3. PREPROCESSING
 # ==========================================
-def clean_text(text):
+def sanitize_text(text):
     text = str(text).lower()
-    text = re.sub(r'<.*?>', '', text) 
+    text = re.sub(r'<.*?>', '', text)
     return text
 
-def preprocess_input(description, input_desc, output_desc):
-    # Note: We do NOT use the title for prediction to maintain consistency 
-    # with how the model was trained (which only used desc + in + out).
-    combined_text = f"{description} {input_desc} {output_desc}"
-    cleaned_text = clean_text(combined_text)
+def extract_features(title, desc, inp, out):
+    full_text = f"{title} {desc} {inp} {out}"
+    clean_text = sanitize_text(full_text)
     
-    X_text = vectorizer.transform([cleaned_text]).toarray()
-    text_len = len(cleaned_text.split())
-    X_len = scaler.transform([[text_len]])
+    text_vector = tfidf.transform([clean_text]).toarray()
+    word_count = len(clean_text.split())
+    len_vector = scaler.transform([[word_count]])
     
-    return np.hstack((X_text, X_len))
+    return np.hstack((text_vector, len_vector))
 
 # ==========================================
-# 3. USER INTERFACE
+# 4. UI LAYOUT
 # ==========================================
-st.markdown("<h1 style='color: white; text-align: center;'>🤖 AutoJudge AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='color: white; text-align: center; margin-bottom: 30px;'>Predict Competitive Programming Problem Difficulty</p>", unsafe_allow_html=True)
+st.markdown(
+    "<h1 style='text-align:center;'>⚡ AutoJudge Pro</h1>"
+    "<p style='text-align:center; color:#a0a0a0; font-size: 1.2rem;'>AI-Powered CP Problem Classifier</p>",
+    unsafe_allow_html=True
+)
 
-# -- INPUT CARD --
+# The CSS automatically applies the Glassmorphism effect to this container block
 with st.container():
-    st.markdown('<div class="card-3d">', unsafe_allow_html=True)
-    
-    # NEW: Problem Title Input
-    title = st.text_input("Problem Title", placeholder="e.g., Dijkstra's Shortest Path")
-    
-    desc = st.text_area("Problem Description", height=150, placeholder="e.g., Given a graph with N nodes...")
+    p_title = st.text_input("Problem Title", placeholder="e.g. Dijkstra's Shortest Path")
+    p_desc = st.text_area("Problem Statement", height=150, placeholder="Paste description here...")
     
     col1, col2 = st.columns(2)
     with col1:
-        inp_desc = st.text_area("Input Format", height=80, placeholder="e.g., First line T...")
+        p_in = st.text_area("Input Spec", height=80)
     with col2:
-        out_desc = st.text_area("Output Format", height=80, placeholder="e.g., Print the integer...")
-        
-    st.markdown('</div>', unsafe_allow_html=True)
+        p_out = st.text_area("Output Spec", height=80)
+
+st.write("") # Spacer
 
 # ==========================================
-# 4. PREDICTION LOGIC
+# 5. ACTION LOGIC
 # ==========================================
-st.write("") # Spacing
-
-if st.button("🚀 Analyze Problem"):
-    if not desc:
-        st.warning("Please enter at least a problem description.")
-    else:
-        # Run Prediction
-        X_input = preprocess_input(desc, inp_desc, out_desc)
-        pred_class = clf.predict(X_input)[0]
-        pred_score = reg.predict(X_input)[0]
+if st.button("🚀 Analyze Difficulty"):
+    
+    if not p_desc:
+        st.warning("Please provide a problem description.")
+        st.stop()
         
-        display_class = pred_class.title()
-        
-        # Determine Color
-        if display_class == "Easy":
-            res_color = "#2ecc71"
-        elif display_class == "Medium":
-            res_color = "#f39c12"
-        else:
-            res_color = "#e74c3c"
-            
-        # Handle empty title for display
-        display_title = title if title else "Untitled Problem"
+    safe_title = p_title if p_title else "Untitled Problem"
+    
+    # 1. Inference
+    features = extract_features(safe_title, p_desc, p_in, p_out)
+    pred_class = classifier.predict(features)[0]
+    pred_score = int(np.clip(regressor.predict(features)[0], 0, 3500))
+    
+    # 2. Display Logic
+    display_class = pred_class.title()
+    
+    # Brighter colors to pop against the dark glass background
+    color_map = {
+        "Easy": "#00ff88",   # Neon Green
+        "Medium": "#ffaa00", # Neon Orange
+        "Hard": "#ff0055"    # Neon Red
+    }
+    accent_color = color_map.get(display_class, "#ffffff")
 
-        # -- RESULT CARD --
-        st.markdown(f"""
-        <div class="card-3d" style="text-align: center;">
-            <h3 style='color: #555; margin: 0;'>Analysis Report for:</h3>
-            <h2 style='color: #333; margin-top: 5px;'>{display_title}</h2>
-            <hr style="border: 1px solid #eee;">
+    # 3. Gauge Math
+    percentage = pred_score / 3500
+    fill_angle = int(percentage * 180)
+
+    # 4. Render HTML Card (Updated for Glassmorphism)
+    result_html = f"""
+    <div style="
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        padding: 30px; 
+        text-align:center; 
+        font-family:'Helvetica Neue', sans-serif;
+        color: white;
+        transition: transform 0.3s ease;
+        "
+        onmouseover="this.style.transform='translateY(-5px) scale(1.01)'"
+        onmouseout="this.style.transform='translateY(0px) scale(1)'"
+        >
+        
+        <h3 style="color:#b0b0b0; margin:0; text-transform:uppercase; letter-spacing:1px; font-size:0.9rem;">Analysis Report</h3>
+        <h2 style="color:white; margin-top:10px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">{safe_title}</h2>
+        <hr style="border-color: rgba(255,255,255,0.2);">
+        
+        <div style="display:flex; justify-content:space-around; align-items:center; margin-top:25px;">
             
-            <div style="display: flex; justify-content: space-around; align-items: center; margin-top: 20px;">
-                <div>
-                    <h4 style="color: #777; margin-bottom: 5px;">Class</h4>
-                    <h1 style="color: {res_color}; font-size: 3rem; margin: 0; text-shadow: 1px 1px 2px #ccc;">{display_class}</h1>
-                </div>
-                <div style="height: 60px; border-left: 2px solid #eee;"></div>
-                <div>
-                    <h4 style="color: #777; margin-bottom: 5px;">Rating</h4>
-                    <h1 style="color: #333; font-size: 3rem; margin: 0; text-shadow: 1px 1px 2px #ccc;">{int(pred_score)}</h1>
+            <div>
+                <span style="color:#b0b0b0; font-weight:600;">DIFFICULTY</span><br>
+                <span style="font-size:3.5rem; font-weight:800; color:{accent_color}; text-shadow: 0 0 15px {accent_color}80;">
+                    {display_class}
+                </span>
+            </div>
+            
+            <div style="height:80px; border-left:2px solid rgba(255,255,255,0.1);"></div>
+            
+            <div style="width:160px;">
+                <span style="color:#b0b0b0; font-weight:600;">RATING</span>
+                
+                <div style="position:relative; width:160px; height:80px; overflow:hidden; margin:15px auto 0;">
+                    
+                    <div style="position:absolute; width:160px; height:160px; 
+                                border-radius:50%; background:rgba(255,255,255,0.1);"></div>
+                                
+                    <div style="position:absolute; width:160px; height:160px; 
+                                border-radius:50%;
+                                background:conic-gradient(from 270deg, 
+                                    {accent_color} 0deg, 
+                                    {accent_color} {fill_angle}deg, 
+                                    transparent {fill_angle}deg
+                                ); 
+                                box-shadow: 0 0 20px {accent_color}60;"></div>
+                    
+                    <div style="position:absolute; width:120px; height:120px; 
+                                background:rgba(0,0,0,0.4); /* Darker inner circle */
+                                backdrop-filter: blur(5px);
+                                border-radius:50%; 
+                                top:20px; left:20px;
+                                border: 1px solid rgba(255,255,255,0.1);"></div>
+                    
+                    <div style="position:absolute; width:100%; top:45px; 
+                                text-align:center; font-size:1.8rem; 
+                                font-weight:bold; color:white;
+                                text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        {pred_score}
+                    </div>
                 </div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-
-        # Progress Bar
-        st.write(f"**Difficulty Meter**")
-        progress_val = min(max(pred_score / 3500, 0.0), 1.0)
-        st.progress(progress_val)
+    </div>
+    """
+    
+    components.html(textwrap.dedent(result_html), height=380)
