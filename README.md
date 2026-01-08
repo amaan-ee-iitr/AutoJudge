@@ -7,6 +7,8 @@ An AI-powered machine learning application that predicts the difficulty rating o
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
+## Demo video link
+https://youtu.be/QrpEH7nq5lg
 ## ✨ Features
 
 - 🎯 **Dual Prediction System**: Classifies problems into difficulty categories (Easy/Medium/Hard) and predicts numerical ratings (800-3500)
