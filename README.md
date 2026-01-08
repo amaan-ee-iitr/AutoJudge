@@ -68,7 +68,8 @@ Before training, ensure you have a `problems.jsonl` file with the following stru
   "description": "Problem description text...",
   "input_description": "Input specification...",
   "output_description": "Output specification...",
-  "problem_class": "Easy"  // or "Medium" or "Hard"
+  "problem_class": "Easy"  // or "Medium" or "Hard",
+   "problem_score": "7" // 0 to 10
 }
 ```
 
